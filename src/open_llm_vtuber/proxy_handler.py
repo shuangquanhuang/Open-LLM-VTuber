@@ -121,8 +121,8 @@ class ProxyHandler:
             while True:
                 message = await websocket.receive_json()
 
-                # Process text-input messages through the queue
-                if message.get("type") == "text-input":
+                # Process speech messages through the queue
+                if message.get("type") in {"text-input", "speak"}:
                     # Queue the message with the sender's ID
                     self.message_queue.queue_message(message, client_id)
                 # Handle interrupt signals

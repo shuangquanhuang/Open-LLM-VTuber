@@ -135,12 +135,10 @@ class ProxyMessageQueue:
         """Forward a message using the provided forward function"""
         try:
             if self._forward_func:
-                # If this is a text input, send transcription first
-                if message.get("type") == "text-input":
-                    # Create transcription message
+                # If this is a text input, show the externally supplied text first
+                if message.get("type") in {"text-input", "speak"}:
                     transcription_message = message.copy()
                     transcription_message["type"] = "user-input-transcription"
-                    # Forward transcription message
                     await self._forward_func(transcription_message, sender_id)
 
                 # Forward the original message

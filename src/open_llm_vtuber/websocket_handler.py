@@ -22,11 +22,7 @@ from .chat_history_manager import (
     get_history_list,
 )
 from .config_manager.utils import scan_config_alts_directory, scan_bg_directory
-from .conversations.conversation_handler import (
-    handle_conversation_trigger,
-    handle_group_interrupt,
-    handle_individual_interrupt,
-)
+from .conversations.speech_broadcast import process_speech_broadcast
 
 
 class MessageType(Enum):
@@ -39,7 +35,7 @@ class MessageType(Enum):
         "create-new-history",
         "delete-history",
     ]
-    CONVERSATION = ["mic-audio-end", "text-input", "ai-speak-signal"]
+    CONVERSATION = ["mic-audio-end", "text-input", "speak", "ai-speak-signal"]
     CONFIG = ["fetch-configs", "switch-config"]
     CONTROL = ["interrupt-signal", "audio-play-start"]
     DATA = ["mic-audio-data"]
@@ -51,6 +47,7 @@ class WSMessage(TypedDict, total=False):
     type: str
     action: Optional[str]
     text: Optional[str]
+    tts_text: Optional[str]
     audio: Optional[List[float]]
     images: Optional[List[str]]
     history_uid: Optional[str]
@@ -84,11 +81,12 @@ class WebSocketHandler:
             "create-new-history": self._handle_create_history,
             "delete-history": self._handle_delete_history,
             "interrupt-signal": self._handle_interrupt,
-            "mic-audio-data": self._handle_audio_data,
-            "mic-audio-end": self._handle_conversation_trigger,
-            "raw-audio-data": self._handle_raw_audio_data,
-            "text-input": self._handle_conversation_trigger,
-            "ai-speak-signal": self._handle_conversation_trigger,
+            "mic-audio-data": self._handle_ignored_input,
+            "mic-audio-end": self._handle_ignored_input,
+            "raw-audio-data": self._handle_ignored_input,
+            "text-input": self._handle_speech_broadcast,
+            "speak": self._handle_speech_broadcast,
+            "ai-speak-signal": self._handle_ignored_input,
             "fetch-configs": self._handle_fetch_configs,
             "switch-config": self._handle_config_switch,
             "fetch-backgrounds": self._handle_fetch_backgrounds,
@@ -172,8 +170,8 @@ class WebSocketHandler:
         # Send initial group status
         await self.send_group_update(websocket, client_uid)
 
-        # Start microphone
-        await websocket.send_text(json.dumps({"type": "control", "text": "start-mic"}))
+        # Hermes provides the final text. Keep the frontend in playback-only mode.
+        await websocket.send_text(json.dumps({"type": "control", "text": "stop-mic"}))
 
     async def _init_service_context(
         self, send_text: Callable, client_uid: str
@@ -280,15 +278,10 @@ class WebSocketHandler:
     async def handle_disconnect(self, client_uid: str) -> None:
         """Handle client disconnection"""
         group = self.chat_group_manager.get_client_group(client_uid)
-        if group:
-            await handle_group_interrupt(
-                group_id=group.group_id,
-                heard_response="",
-                current_conversation_tasks=self.current_conversation_tasks,
-                chat_group_manager=self.chat_group_manager,
-                client_contexts=self.client_contexts,
-                broadcast_to_group=self.broadcast_to_group,
-            )
+        task_key = group.group_id if group else client_uid
+        task = self.current_conversation_tasks.get(task_key)
+        if task and not task.done():
+            task.cancel()
 
         await handle_client_disconnect(
             client_uid=client_uid,
@@ -341,6 +334,19 @@ class WebSocketHandler:
             exclude_uid=exclude_uid,
         )
 
+    async def send_to_all_clients(self, message: str) -> None:
+        """Send one backend message to every connected WebSocket client."""
+        disconnected_clients = []
+        for target_uid, target_ws in self.client_connections.items():
+            try:
+                await target_ws.send_text(message)
+            except Exception as e:
+                logger.error(f"Failed to send broadcast message to {target_uid}: {e}")
+                disconnected_clients.append(target_uid)
+
+        for target_uid in disconnected_clients:
+            await self.handle_disconnect(target_uid)
+
     async def send_group_update(self, websocket: WebSocket, client_uid: str):
         """Sends group information to a client"""
         group = self.chat_group_manager.get_client_group(client_uid)
@@ -369,27 +375,20 @@ class WebSocketHandler:
     async def _handle_interrupt(
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
-        """Handle conversation interruption"""
-        heard_response = data.get("text", "")
-        context = self.client_contexts[client_uid]
+        """Cancel the current speech broadcast without touching the agent."""
         group = self.chat_group_manager.get_client_group(client_uid)
+        task_key = group.group_id if group and len(group.members) > 1 else client_uid
+        task = self.current_conversation_tasks.get(task_key)
 
-        if group and len(group.members) > 1:
-            await handle_group_interrupt(
-                group_id=group.group_id,
-                heard_response=heard_response,
-                current_conversation_tasks=self.current_conversation_tasks,
-                chat_group_manager=self.chat_group_manager,
-                client_contexts=self.client_contexts,
-                broadcast_to_group=self.broadcast_to_group,
+        if task and not task.done():
+            task.cancel()
+            self.current_conversation_tasks.pop(task_key, None)
+
+        await websocket.send_text(
+            json.dumps(
+                {"type": "interrupt-signal", "text": "speech-broadcast-interrupted"}
             )
-        else:
-            await handle_individual_interrupt(
-                client_uid=client_uid,
-                current_conversation_tasks=self.current_conversation_tasks,
-                context=context,
-                heard_response=heard_response,
-            )
+        )
 
     async def _handle_history_list_request(
         self, websocket: WebSocket, client_uid: str, data: WSMessage
@@ -510,22 +509,38 @@ class WebSocketHandler:
                         json.dumps({"type": "control", "text": "mic-audio-end"})
                     )
 
-    async def _handle_conversation_trigger(
+    async def _handle_ignored_input(
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
-        """Handle triggers that start a conversation"""
-        await handle_conversation_trigger(
-            msg_type=data.get("type", ""),
-            data=data,
-            client_uid=client_uid,
-            context=self.client_contexts[client_uid],
-            websocket=websocket,
-            client_contexts=self.client_contexts,
-            client_connections=self.client_connections,
-            chat_group_manager=self.chat_group_manager,
-            received_data_buffers=self.received_data_buffers,
-            current_conversation_tasks=self.current_conversation_tasks,
-            broadcast_to_group=self.broadcast_to_group,
+        """Ignore inputs that would otherwise trigger ASR, LLM, or proactive work."""
+        logger.debug(f"Ignoring message in playback-only mode: {data.get('type')}")
+
+    async def _handle_speech_broadcast(
+        self, websocket: WebSocket, client_uid: str, data: WSMessage
+    ) -> None:
+        """Speak externally provided text without running the conversation chain."""
+        task = self.current_conversation_tasks.get(client_uid)
+        if task and not task.done():
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "message": "Speech broadcast already in progress",
+                    }
+                )
+            )
+            return
+
+        text = data.get("text", "")
+        tts_text = data.get("tts_text") if isinstance(data, dict) else None
+        self.current_conversation_tasks[client_uid] = asyncio.create_task(
+            process_speech_broadcast(
+                context=self.client_contexts[client_uid],
+                websocket_send=self.send_to_all_clients,
+                client_uid=client_uid,
+                text=text,
+                tts_text=tts_text,
+            )
         )
 
     async def _handle_fetch_configs(
