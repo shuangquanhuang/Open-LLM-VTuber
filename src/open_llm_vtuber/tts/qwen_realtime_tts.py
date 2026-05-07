@@ -166,13 +166,26 @@ class TTSEngine(TTSInterface):
         )
 
         try:
+            instructions = self._build_instructions(emotions, instruct=instruct)
+            logger.info(
+                "Qwen realtime TTS request params: "
+                f"model={self.model!r}, voice={self.voice!r}, "
+                f"region={self.region!r}, url={self._get_url(self.region)!r}, "
+                f"language_type={self.language_type!r}, "
+                f"optimize_instructions={self.optimize_instructions!r}, "
+                f"speech_rate={self.speech_rate!r}, pitch_rate={self.pitch_rate!r}, "
+                f"volume={self.volume!r}, timeout={self.timeout!r}, "
+                f"idle_after_audio={self.idle_after_audio!r}, "
+                f"emotions={emotions!r}, text={text!r}, "
+                f"instructions={instructions!r}"
+            )
             tts.connect()
             tts.update_session(
                 voice=self.voice,
                 response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
                 mode="server_commit",
                 language_type=self.language_type,
-                instructions=self._build_instructions(emotions, instruct=instruct),
+                instructions=instructions,
                 optimize_instructions=self.optimize_instructions,
                 speech_rate=self.speech_rate,
                 pitch_rate=self.pitch_rate,
