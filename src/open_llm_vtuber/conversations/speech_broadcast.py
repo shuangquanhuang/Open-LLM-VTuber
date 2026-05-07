@@ -35,11 +35,13 @@ async def process_speech_broadcast(
         expressions = context.live2d_model.extract_emotion(text)
         actions = Actions(expressions=expressions or None)
         display_text = text
-        speech_text = (
-            tts_text
-            if tts_text is not None
-            else context.live2d_model.remove_emotion_keywords(text)
-        ).strip()
+        if tts_text is not None:
+            speech_text = tts_text
+        elif getattr(context.tts_engine, "uses_emotion_instructions", False):
+            speech_text = text
+        else:
+            speech_text = context.live2d_model.remove_emotion_keywords(text)
+        speech_text = speech_text.strip()
 
         await websocket_send(
             json.dumps({"type": "control", "text": "conversation-chain-start"})

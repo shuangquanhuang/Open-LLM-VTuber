@@ -680,6 +680,108 @@ class CartesiaTTSConfig(I18nMixin):
     }
 
 
+class QwenRealtimeTTSConfig(I18nMixin):
+    model: str = Field(
+        "qwen3-tts-instruct-flash-realtime",
+        alias="model",
+    )
+    voice: str = Field("Bunny", alias="voice")
+    region: str = Field("cn", alias="region")
+    api_key: str = Field("", alias="api_key")
+    language_type: str = Field("Chinese", alias="language_type")
+    instructions: str = Field("", alias="instructions")
+    optimize_instructions: bool = Field(True, alias="optimize_instructions")
+    speech_rate: float = Field(1.08, alias="speech_rate")
+    pitch_rate: float = Field(1.05, alias="pitch_rate")
+    volume: int = Field(70, alias="volume")
+    timeout: float = Field(30, alias="timeout")
+    idle_after_audio: float = Field(2, alias="idle_after_audio")
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "model": Description(
+            en="DashScope Qwen realtime TTS model",
+            zh="DashScope Qwen 实时语音合成模型",
+        ),
+        "voice": Description(en="Voice name", zh="音色名称"),
+        "region": Description(
+            en="DashScope region: cn or intl/sg/singapore",
+            zh="DashScope 地域：cn 或 intl/sg/singapore",
+        ),
+        "api_key": Description(
+            en="DashScope API key. If empty, DASHSCOPE_API_KEY is used.",
+            zh="DashScope API Key。留空时读取 DASHSCOPE_API_KEY 环境变量。",
+        ),
+        "language_type": Description(en="Language type", zh="语言类型"),
+        "instructions": Description(en="Voice style instructions", zh="语音风格指令"),
+        "optimize_instructions": Description(
+            en="Whether DashScope should optimize instructions",
+            zh="是否让 DashScope 优化风格指令",
+        ),
+        "speech_rate": Description(en="Speech rate", zh="语速"),
+        "pitch_rate": Description(en="Pitch rate", zh="音调"),
+        "volume": Description(en="Volume", zh="音量"),
+        "timeout": Description(
+            en="Timeout in seconds for one synthesis request",
+            zh="单次合成请求超时时间（秒）",
+        ),
+        "idle_after_audio": Description(
+            en="Treat synthesis as complete after this many idle seconds once audio has arrived",
+            zh="收到音频后空闲多少秒就认为本次合成完成",
+        ),
+    }
+
+
+class Qwen3LocalTTSConfig(I18nMixin):
+    model_path: str = Field(
+        "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+        alias="model_path",
+    )
+    mode: Literal["custom_voice", "voice_design"] = Field("custom_voice", alias="mode")
+    language: str = Field("Chinese", alias="language")
+    speaker: str = Field("Vivian", alias="speaker")
+    instruct: str = Field("", alias="instruct")
+    device_map: str = Field("auto", alias="device_map")
+    dtype: Literal["auto", "float16", "bfloat16", "float32"] = Field(
+        "auto", alias="dtype"
+    )
+    attn_implementation: str = Field("", alias="attn_implementation")
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "model_path": Description(
+            en="Qwen3-TTS model id or local model directory",
+            zh="Qwen3-TTS 模型 ID 或本地模型目录",
+        ),
+        "mode": Description(
+            en="Local Qwen3-TTS mode: custom_voice or voice_design",
+            zh="本地 Qwen3-TTS 模式：custom_voice 或 voice_design",
+        ),
+        "language": Description(
+            en="Target language, e.g. Chinese, English, or Auto",
+            zh="目标语言，如 Chinese、English 或 Auto",
+        ),
+        "speaker": Description(
+            en="Speaker name for custom_voice mode",
+            zh="custom_voice 模式使用的说话人名称",
+        ),
+        "instruct": Description(
+            en="Natural-language voice style and emotion instructions",
+            zh="自然语言音色、语气和情绪指令",
+        ),
+        "device_map": Description(
+            en="Device map passed to Qwen3TTSModel.from_pretrained",
+            zh="传给 Qwen3TTSModel.from_pretrained 的 device_map",
+        ),
+        "dtype": Description(
+            en="Model dtype: auto, float16, bfloat16, or float32",
+            zh="模型 dtype：auto、float16、bfloat16 或 float32",
+        ),
+        "attn_implementation": Description(
+            en="Optional attention implementation, e.g. flash_attention_2",
+            zh="可选 attention 实现，如 flash_attention_2",
+        ),
+    }
+
+
 class TTSConfig(I18nMixin):
     """Configuration for Text-to-Speech."""
 
@@ -702,6 +804,8 @@ class TTSConfig(I18nMixin):
         "elevenlabs_tts",
         "cartesia_tts",
         "piper_tts",
+        "qwen_realtime_tts",
+        "qwen3_local_tts",
     ] = Field(..., alias="tts_model")
 
     azure_tts: Optional[AzureTTSConfig] = Field(None, alias="azure_tts")
@@ -726,6 +830,10 @@ class TTSConfig(I18nMixin):
     elevenlabs_tts: ElevenLabsTTSConfig | None = Field(None, alias="elevenlabs_tts")
     cartesia_tts: CartesiaTTSConfig | None = Field(None, alias="cartesia_tts")
     piper_tts: Optional[PiperTTSConfig] = Field(None, alias="piper_tts")
+    qwen_realtime_tts: QwenRealtimeTTSConfig | None = Field(
+        None, alias="qwen_realtime_tts"
+    )
+    qwen3_local_tts: Qwen3LocalTTSConfig | None = Field(None, alias="qwen3_local_tts")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "tts_model": Description(
@@ -769,6 +877,14 @@ class TTSConfig(I18nMixin):
             en="Configuration for Cartesia TTS", zh="Cartesia TTS 配置"
         ),
         "piper_tts": Description(en="Configuration for Piper TTS", zh="Piper TTS 配置"),
+        "qwen_realtime_tts": Description(
+            en="Configuration for DashScope Qwen realtime TTS",
+            zh="DashScope Qwen 实时语音合成配置",
+        ),
+        "qwen3_local_tts": Description(
+            en="Configuration for local Qwen3-TTS",
+            zh="本地 Qwen3-TTS 配置",
+        ),
     }
 
     @model_validator(mode="after")
@@ -813,4 +929,10 @@ class TTSConfig(I18nMixin):
 
         elif tts_model == "piper_tts" and values.piper_tts is not None:
             values.piper_tts.model_validate(values.piper_tts.model_dump())
+        elif tts_model == "qwen_realtime_tts" and values.qwen_realtime_tts is not None:
+            values.qwen_realtime_tts.model_validate(
+                values.qwen_realtime_tts.model_dump()
+            )
+        elif tts_model == "qwen3_local_tts" and values.qwen3_local_tts is not None:
+            values.qwen3_local_tts.model_validate(values.qwen3_local_tts.model_dump())
         return values

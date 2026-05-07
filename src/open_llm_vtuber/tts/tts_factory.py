@@ -211,6 +211,38 @@ class TTSFactory:
                 normalize_audio=kwargs.get("normalize_audio"),
                 use_cuda=kwargs.get("use_cuda"),
             )
+        elif engine_type == "qwen_realtime_tts":
+            from .qwen_realtime_tts import TTSEngine as QwenRealtimeTTSEngine
+
+            return QwenRealtimeTTSEngine(
+                model=kwargs.get("model", "qwen3-tts-instruct-flash-realtime"),
+                voice=kwargs.get("voice", "Bunny"),
+                region=kwargs.get("region", "cn"),
+                api_key=kwargs.get("api_key", ""),
+                language_type=kwargs.get("language_type", "Chinese"),
+                instructions=kwargs.get("instructions", ""),
+                optimize_instructions=kwargs.get("optimize_instructions", True),
+                speech_rate=kwargs.get("speech_rate", 1.08),
+                pitch_rate=kwargs.get("pitch_rate", 1.05),
+                volume=kwargs.get("volume", 70),
+                timeout=kwargs.get("timeout", 30),
+                idle_after_audio=kwargs.get("idle_after_audio", 2),
+            )
+        elif engine_type == "qwen3_local_tts":
+            from .qwen3_local_tts import TTSEngine as Qwen3LocalTTSEngine
+
+            return Qwen3LocalTTSEngine(
+                model_path=kwargs.get(
+                    "model_path", "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+                ),
+                mode=kwargs.get("mode", "custom_voice"),
+                language=kwargs.get("language", "Chinese"),
+                speaker=kwargs.get("speaker", "Vivian"),
+                instruct=kwargs.get("instruct", ""),
+                device_map=kwargs.get("device_map", "auto"),
+                dtype=kwargs.get("dtype", "auto"),
+                attn_implementation=kwargs.get("attn_implementation", ""),
+            )
         else:
             raise ValueError(f"Unknown TTS engine type: {engine_type}")
 

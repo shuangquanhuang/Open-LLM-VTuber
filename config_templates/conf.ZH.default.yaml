@@ -274,7 +274,8 @@ character_config:
     #   'azure_tts', 'pyttsx3_tts', 'edge_tts', 'bark_tts',
     #   'cosyvoice_tts', 'melo_tts', 'coqui_tts', 'piper_tts',
     #   'fish_api_tts', 'x_tts', 'gpt_sovits_tts', 'sherpa_onnx_tts'
-    #   'minimax_tts', 'elevenlabs_tts', 'cartesia_tts'
+    #   'minimax_tts', 'elevenlabs_tts', 'cartesia_tts', 'qwen_realtime_tts',
+    #   'qwen3_local_tts'
 
     siliconflow_tts:
       api_url: "https://api.siliconflow.cn/v1/audio/speech"
@@ -301,6 +302,45 @@ character_config:
       # 查看文档：https://github.com/rany2/edge-tts
       # 使用 `edge-tts --list-voices` 列出所有可用语音
       voice: zh-CN-XiaoxiaoNeural # 'en-US-AvaMultilingualNeural' #'zh-CN-XiaoxiaoNeural' # 'ja-JP-NanamiNeural'
+
+    qwen_realtime_tts:
+      model: 'qwen3-tts-instruct-flash-realtime'
+      voice: 'Bunny'
+      region: 'cn'
+      api_key: '' # 留空时读取 DASHSCOPE_API_KEY 环境变量
+      language_type: 'Chinese'
+      instructions: >-
+        声音要年轻、清亮、俏皮可爱，语气自然、有表现力。
+        按原文含义播报，不要自行补充、解释、改写事实或延长内容。
+        遇到 [neutral]、[anger]、[disgust]、[fear]、[joy]、[smirk]、[sadness]、[surprise] 等情绪标签时，
+        只把它们作为语气、情绪和节奏提示，绝对不要读出标签本身，也不要读出表情编号。
+        不要朗读标点符号、括号符号、Markdown 标记或代码围栏。
+        中文优先使用自然口语节奏，句尾收束干净，短句之间保留轻微停顿。
+      optimize_instructions: true
+      speech_rate: 1.08
+      pitch_rate: 1.05
+      volume: 70
+      timeout: 30
+      idle_after_audio: 2
+
+    qwen3_local_tts:
+      # 可使用 Hugging Face / ModelScope 模型 ID，或已下载到本地的模型目录。
+      model_path: 'Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice'
+      # custom_voice 使用内置说话人；voice_design 使用自由文本音色设计指令。
+      mode: 'custom_voice'
+      language: 'Chinese'
+      speaker: 'Vivian'
+      instruct: >-
+        你是一个负责播报 Hermes Agent 推送文本的 Live2D AI 角色。
+        声音要年轻、清亮、俏皮可爱，语气自然、有表现力，但不要过度夸张或吵闹。
+        按原文含义播报，不要自行补充、解释、改写事实或延长内容。
+        遇到 [neutral]、[anger]、[disgust]、[fear]、[joy]、[smirk]、[sadness]、[surprise] 等情绪标签时，
+        只把它们作为语气、情绪和节奏提示，绝对不要读出标签本身，也不要读出表情编号。
+        不要朗读标点符号、括号符号、Markdown 标记或代码围栏。
+        中文优先使用自然口语节奏，句尾收束干净，短句之间保留轻微停顿。
+      device_map: 'auto'
+      dtype: 'auto'
+      attn_implementation: ''
 
     # pyttsx3_tts 没有任何配置。
 
