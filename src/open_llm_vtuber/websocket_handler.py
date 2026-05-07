@@ -336,6 +336,10 @@ class WebSocketHandler:
 
     async def send_to_all_clients(self, message: str) -> None:
         """Send one backend message to every connected WebSocket client."""
+        logger.debug(
+            f"Broadcasting message to {len(self.client_connections)} client(s): "
+            f"{message[:160]}"
+        )
         disconnected_clients = []
         for target_uid, target_ws in self.client_connections.items():
             try:

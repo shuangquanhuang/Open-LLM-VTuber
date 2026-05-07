@@ -47,7 +47,9 @@ class TTSEngine(TTSInterface):
         self.file_extension = "wav"
         self._model = None
 
-    def generate_audio(self, text: str, file_name_no_ext=None) -> str:
+    def generate_audio(
+        self, text: str, file_name_no_ext=None, instruct: str | None = None
+    ) -> str:
         text = self._ensure_str(text)
         emotions = self._extract_emotions(text)
         text = self._normalize_text(self._remove_emotion_tags(text))
@@ -58,7 +60,7 @@ class TTSEngine(TTSInterface):
 
         try:
             model = self._load_model()
-            instruct = self._build_instruct(emotions)
+            instruct = self._build_instruct(emotions, instruct=instruct)
 
             if self.mode == "voice_design":
                 wavs, sample_rate = model.generate_voice_design(
@@ -141,11 +143,10 @@ class TTSEngine(TTSInterface):
             )
         return dtype_map[self.dtype]
 
-    def _build_instruct(self, emotions: list[str]) -> str:
+    def _build_instruct(self, emotions: list[str], instruct: str | None = None) -> str:
         emotion_hint = self._build_emotion_hint(emotions)
-        if self.instruct and emotion_hint:
-            return f"{self.instruct}\n{emotion_hint}"
-        return self.instruct or emotion_hint
+        parts = [part for part in [self.instruct, instruct, emotion_hint] if part]
+        return "\n".join(parts)
 
     def _build_emotion_hint(self, emotions: list[str]) -> str:
         if not emotions:

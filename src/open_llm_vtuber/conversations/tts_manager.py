@@ -35,6 +35,7 @@ class TTSTaskManager:
         live2d_model: Live2dModel,
         tts_engine: TTSInterface,
         websocket_send: WebSocketSend,
+        instruct: str | None = None,
     ) -> None:
         """
         Queue a TTS task while maintaining order of delivery.
@@ -85,6 +86,7 @@ class TTSTaskManager:
                 live2d_model=live2d_model,
                 tts_engine=tts_engine,
                 sequence_number=current_sequence,
+                instruct=instruct,
             )
         )
         self.task_list.append(task)
@@ -135,11 +137,16 @@ class TTSTaskManager:
         live2d_model: Live2dModel,
         tts_engine: TTSInterface,
         sequence_number: int,
+        instruct: str | None = None,
     ) -> None:
         """Process TTS generation and queue the result for ordered delivery"""
         audio_file_path = None
         try:
-            audio_file_path = await self._generate_audio(tts_engine, tts_text)
+            audio_file_path = await self._generate_audio(
+                tts_engine,
+                tts_text,
+                instruct=instruct,
+            )
             payload = prepare_audio_payload(
                 audio_path=audio_file_path,
                 display_text=display_text,
@@ -163,12 +170,15 @@ class TTSTaskManager:
                 tts_engine.remove_file(audio_file_path)
                 logger.debug("Audio cache file cleaned.")
 
-    async def _generate_audio(self, tts_engine: TTSInterface, text: str) -> str:
+    async def _generate_audio(
+        self, tts_engine: TTSInterface, text: str, instruct: str | None = None
+    ) -> str:
         """Generate audio file from text"""
         logger.debug(f"🏃Generating audio for '''{text}'''...")
         return await tts_engine.async_generate_audio(
             text=text,
             file_name_no_ext=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}",
+            instruct=instruct,
         )
 
     async def wait_until_payloads_sent(self) -> None:

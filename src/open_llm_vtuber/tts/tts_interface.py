@@ -1,12 +1,15 @@
 import abc
 import os
 import asyncio
+import inspect
 
 from loguru import logger
 
 
 class TTSInterface(metaclass=abc.ABCMeta):
-    async def async_generate_audio(self, text: str, file_name_no_ext=None) -> str:
+    async def async_generate_audio(
+        self, text: str, file_name_no_ext=None, instruct: str | None = None
+    ) -> str:
         """
         Asynchronously generate speech audio file using TTS.
 
@@ -22,10 +25,27 @@ class TTSInterface(metaclass=abc.ABCMeta):
         str: the path to the generated audio file
 
         """
+        signature = inspect.signature(self.generate_audio)
+        supports_instruct = (
+            "instruct" in signature.parameters
+            or any(
+                param.kind == inspect.Parameter.VAR_KEYWORD
+                for param in signature.parameters.values()
+            )
+        )
+        if supports_instruct:
+            return await asyncio.to_thread(
+                self.generate_audio,
+                text,
+                file_name_no_ext,
+                instruct=instruct,
+            )
         return await asyncio.to_thread(self.generate_audio, text, file_name_no_ext)
 
     @abc.abstractmethod
-    def generate_audio(self, text: str, file_name_no_ext=None) -> str:
+    def generate_audio(
+        self, text: str, file_name_no_ext=None, instruct: str | None = None
+    ) -> str:
         """
         Generate speech audio file using TTS.
         text: str

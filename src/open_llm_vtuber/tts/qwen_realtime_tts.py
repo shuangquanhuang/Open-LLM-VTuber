@@ -147,7 +147,9 @@ class TTSEngine(TTSInterface):
             return "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
         return "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
 
-    def generate_audio(self, text: str, file_name_no_ext=None) -> str:
+    def generate_audio(
+        self, text: str, file_name_no_ext=None, instruct: str | None = None
+    ) -> str:
         emotions = self._extract_emotions(text)
         text = self._normalize_text(self._remove_emotion_tags(text))
         if not text:
@@ -170,7 +172,7 @@ class TTSEngine(TTSInterface):
                 response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
                 mode="server_commit",
                 language_type=self.language_type,
-                instructions=self._build_instructions(emotions),
+                instructions=self._build_instructions(emotions, instruct=instruct),
                 optimize_instructions=self.optimize_instructions,
                 speech_rate=self.speech_rate,
                 pitch_rate=self.pitch_rate,
@@ -214,23 +216,23 @@ class TTSEngine(TTSInterface):
             wav_file.setframerate(self.sample_rate)
             wav_file.writeframes(pcm_bytes)
 
-    def _build_instructions(self, emotions: list[str]) -> str:
-        if not emotions:
-            return self.instructions
+    def _build_instructions(
+        self, emotions: list[str], instruct: str | None = None
+    ) -> str:
+        instruction_parts = [part for part in [self.instructions, instruct] if part]
 
-        emotion_codes = [
-            f"{emotion}={self._emotion_to_expression[emotion]}"
-            for emotion in emotions
-        ]
-        emotion_hint = (
-            "本次播报文本包含情绪标签："
-            + "、".join(emotion_codes)
-            + "。请根据这些情绪调整语气、能量和节奏；不要读出情绪标签或表情编号。"
-        )
+        if emotions:
+            emotion_codes = [
+                f"{emotion}={self._emotion_to_expression[emotion]}"
+                for emotion in emotions
+            ]
+            instruction_parts.append(
+                "本次播报文本包含情绪标签："
+                + "、".join(emotion_codes)
+                + "。请根据这些情绪调整语气、能量和节奏；不要读出情绪标签或表情编号。"
+            )
 
-        if self.instructions:
-            return f"{self.instructions}\n{emotion_hint}"
-        return emotion_hint
+        return "\n".join(instruction_parts)
 
     def _extract_emotions(self, text: str) -> list[str]:
         found = []
